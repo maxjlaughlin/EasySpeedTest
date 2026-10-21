@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Everything this window needs is local. Floor plans arrive as data: URLs
+       via IPC, so that scheme is allowed for images only. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; form-action 'none'; base-uri 'none'" />
+  <title>EasySpeedTest</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-mode="pin">
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand-name">EasySpeedTest</span>
+      <span class="brand-version" id="version">v—</span>
+    </div>
+
+    <div class="session-name">
+      <input id="session-name" type="text" aria-label="Survey name" spellcheck="false" />
+    </div>
+
+    <div class="topbar-stats">
+      <div class="stat-chip"><span class="chip-label">Tests</span><span class="chip-value" id="stat-count">0</span></div>
+      <div class="stat-chip"><span class="chip-label">Median</span><span class="chip-value" id="stat-median">—</span></div>
+      <div class="stat-chip"><span class="chip-label">Flagged</span><span class="chip-value" id="stat-flagged">0</span></div>
+      <div class="stat-chip"><span class="chip-label">Data used</span><span class="chip-value" id="stat-data">0 MB</span></div>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="map-pane">
+      <div class="map-toolbar">
+        <div class="mode-group" role="radiogroup" aria-label="Placement mode">
+          <button class="mode-btn is-active" data-mode="pin" role="radio" aria-checked="true">
+            <strong>Free pin</strong><span>Click or arrow-key the crosshair</span>
+          </button>
+          <button class="mode-btn" data-mode="route" role="radio" aria-checked="false">
+            <strong>Route</strong><span>Plot stops once, hotkey walks them</span>
+          </button>
+          <button class="mode-btn" data-mode="assign" role="radio" aria-checked="false">
+            <strong>Walk &amp; place later</strong><span>Test as you go, draw the path after</span>
+          </button>
+        </div>
+
+        <div class="toolbar-right">
+          <button class="btn" id="btn-floorplan">Floor plan…</button>
+          <button class="btn" id="btn-calibrate" title="Click two points a known distance apart">Set scale</button>
+          <button class="btn" id="btn-fit" title="Fit floor plan to window">Fit</button>
+        </div>
+      </div>
+
+      <div class="canvas-wrap" id="canvas-wrap">
+        <canvas id="map" tabindex="0" aria-label="Floor plan with test results"></canvas>
+        <div class="map-empty" id="map-empty">
+          <p><strong>Drop a floor plan image here</strong></p>
+          <p class="muted">PNG, JPG or a screenshot of a fire-escape map. Or skip it — results still
+            land on a blank grid and you can add the plan later.</p>
+        </div>
+        <div class="map-hint" id="map-hint" hidden></div>
+      </div>
+
+      <div class="map-footer">
+        <div class="legend" id="legend" aria-label="Speed legend"></div>
+        <div class="map-meta">
+          <label class="checkline"><input type="checkbox" id="opt-labels" checked /> Show numbers</label>
+          <label class="checkline"><input type="checkbox" id="opt-path" checked /> Show walk path</label>
+          <span class="scale-readout" id="scale-readout">Scale not set</span>
+        </div>
+      </div>
+    </section>
+
+    <aside class="side-pane">
+      <div class="live-card" id="live-card">
+        <div class="live-head">
+          <span class="live-phase" id="live-phase">Ready</span>
+          <span class="live-pos" id="live-pos">No position</span>
+        </div>
+
+        <div class="hero">
+          <div class="hero-main">
+            <span class="hero-value" id="hero-down">—</span>
+            <span class="hero-unit">Mbps down</span>
+          </div>
+          <div class="hero-side">
+            <div class="hero-row"><span id="hero-up">—</span><span class="hero-row-label">up</span></div>
+            <div class="hero-row"><span id="hero-ping">—</span><span class="hero-row-label">ms ping</span></div>
+            <div class="hero-row"><span id="hero-jitter">—</span><span class="hero-row-label">ms jitter</span></div>
+          </div>
+        </div>
+
+        <div class="progress" aria-hidden="true"><div class="progress-fill" id="progress-fill"></div></div>
+
+        <div class="wifi-line" id="wifi-line">Wi-Fi details appear here after a test.</div>
+
+        <button class="btn btn-primary btn-run" id="btn-run">
+          <span>Run test</span>
+          <kbd id="kbd-run">⌘⇧T</kbd>
+        </button>
+        <p class="run-note" id="run-note">Global hotkey — works while this window is in the background.</p>
+      </div>
+
+      <div class="controls-card">
+        <div class="field-row">
+          <label for="sel-profile">Test length</label>
+          <select id="sel-profile"></select>
+        </div>
+        <div class="field-row">
+          <label for="inp-threshold">Flag below</label>
+          <div class="input-suffix">
+            <input type="number" id="inp-threshold" min="0" step="5" />
+            <span>Mbps</span>
+          </div>
+        </div>
+        <div class="field-row">
+          <label for="inp-cap" title="Stops each test early once it has moved this much data">Data cap</label>
+          <div class="input-suffix">
+            <input type="number" id="inp-cap" min="10" step="10" />
+            <span>MB/test</span>
+          </div>
+        </div>
+        <div class="field-row">
+          <label for="inp-step">Auto-advance</label>
+          <div class="input-suffix">
+            <input type="number" id="inp-step" min="0" step="1" />
+            <span>ft</span>
+          </div>
+        </div>
+        <label class="checkline"><input type="checkbox" id="opt-autoadvance" /> Advance after each test</label>
+        <label class="checkline"><input type="checkbox" id="opt-wifi" /> Capture Wi-Fi AP + signal</label>
+        <label class="checkline"><input type="checkbox" id="opt-awake" /> Keep display awake while surveying</label>
+      </div>
+
+      <div class="results-card">
+        <div class="results-head">
+          <h2>Results</h2>
+          <div class="results-actions">
+            <button class="btn btn-sm" id="btn-export-csv">CSV</button>
+            <button class="btn btn-sm" id="btn-export-json">JSON</button>
+            <button class="btn btn-sm" id="btn-export-png">Map PNG</button>
+            <button class="btn btn-sm btn-danger" id="btn-clear">Clear</button>
+          </div>
+        </div>
+        <div class="unplaced-bar" id="unplaced-bar" hidden></div>
+        <div class="table-scroll">
+          <table class="results-table">
+            <thead>
+              <tr>
+                <th scope="col">#</th>
+                <th scope="col">Down</th>
+                <th scope="col">Up</th>
+                <th scope="col">Ping</th>
+                <th scope="col">Where</th>
+                <th scope="col" aria-label="Actions"></th>
+              </tr>
+            </thead>
+            <tbody id="results-body"></tbody>
+          </table>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- Electron does not implement window.prompt(), so numeric input that would
+       otherwise use it goes through this dialog. -->
+  <dialog id="ask-dialog" class="ask">
+    <form method="dialog" id="ask-form">
+      <h3 id="ask-title">Set scale</h3>
+      <p id="ask-message"></p>
+      <div class="input-suffix">
+        <input type="number" id="ask-input" step="any" min="0" />
+        <span id="ask-unit">ft</span>
+      </div>
+      <div class="ask-actions">
+        <button class="btn" value="cancel" type="submit">Cancel</button>
+        <button class="btn btn-primary" value="ok" type="submit" id="ask-ok">Set scale</button>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast-stack" id="toasts" aria-live="polite"></div>
+
+  <script src="palette.js"></script>
+  <script src="map.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
