@@ -90,4 +90,7 @@ The smoke test uses `window.__test`, exposed in `app.js` only when
   and top-left; tagged `vX.Y` on GitHub. `package.json` keeps a third component
   only because npm demands it — bump the first two.
 - Push to `main`.
+- **The v1.0 tag is not on GitHub yet.** The cloud session that built this could
+  push branches but got HTTP 403 on `refs/tags/*`. Create it from a local clone:
+  `git tag -a v1.0 -m "v1.0" 77a8d12 && git push origin v1.0`.
 - No runtime dependencies. Keep it that way; it is why the local build is fast.
